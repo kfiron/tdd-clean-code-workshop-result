@@ -17,9 +17,9 @@ class RollingWindowKeyThrottler(durationWindow: FiniteDuration, max: Int, clock:
   private def _tryAcquire = slidingWindowEnded orElse incrementAndGet
 
   private def slidingWindowEnded: PartialFunction[(String, InvocationInfo), Boolean] = {
-    case item if (clock.currentMillis - item._2.timestamp) > durationWindow.toMillis =>
-      map -= item._1
-      tryAcquire(item._1)
+    case (key,item) if (clock.currentMillis - item.timestamp) > durationWindow.toMillis =>
+      map -= key
+      tryAcquire(key)
   }
 
 

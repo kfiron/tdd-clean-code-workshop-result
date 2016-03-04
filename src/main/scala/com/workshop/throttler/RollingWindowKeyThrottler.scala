@@ -24,7 +24,7 @@ class RollingWindowKeyThrottler(durationWindow: FiniteDuration, max: Int, clock:
 
 
   private def incrementAndGet: PartialFunction[(String, InvocationInfo), Boolean] = {
-    case item => item._2.count.incrementAndGet() <= max
+    case (key,item) => item.count.incrementAndGet() <= max
   }
 
   private def defaultInvocationInfo = {

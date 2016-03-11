@@ -1,12 +1,12 @@
 package com.workshop
 
 
-import org.specs2.matcher.Scope
+import org.specs2.matcher.{Matchers, Scope}
 import org.specs2.mutable.SpecWithJUnit
 import scala.concurrent.duration._
 
 
-class RollingWindowThrottlerTest extends SpecWithJUnit{
+class RollingWindowThrottlerTest extends SpecWithJUnit with Matchers{
 
   trait Context extends Scope{
     val aThrottler = new RollingWindowThrottler(durationWindow = 1.minute, max = 1)
@@ -15,17 +15,23 @@ class RollingWindowThrottlerTest extends SpecWithJUnit{
 
   "RollingWindowThrottler" should {
     "allow request within the sliding window" in new Context  {
-      aThrottler.tryAcquire(anIp) must beTrue
+      aThrottler.tryAcquire(anIp) must beAllowedRequest(anIp)
     }
     "throttle request which exceed the sliding window" in new Context {
-      aThrottler.tryAcquire(anIp) must beTrue
-      aThrottler.tryAcquire(anIp) must beFalse
+      aThrottler.tryAcquire(anIp) must beAllowedRequest(anIp)
+      aThrottler.tryAcquire(anIp) must beThrottledRequest(anIp)
     }
     "allow 2 requests with different key" in new Context {
       val anotherIp = "192.168.10.10"
-      aThrottler.tryAcquire(anIp) must beTrue
-      aThrottler.tryAcquire(anotherIp) must beTrue
+      aThrottler.tryAcquire(anIp) must beAllowedRequest(anIp)
+      aThrottler.tryAcquire(anotherIp) must beAllowedRequest(anIp)
     }
   }
+
+  def beAllowedRequest(key: String) = beTrue ^^
+    { (b: Boolean) => b aka s"expected invocation key $key to be allowed but" }
+
+  def beThrottledRequest(key: String) = beFalse ^^
+    { (b: Boolean) => b aka s"expected invocation key $key to be throttled but" }
 
 }

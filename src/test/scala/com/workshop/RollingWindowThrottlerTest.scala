@@ -1,6 +1,7 @@
 package com.workshop
 
 
+import com.workshop.framework.FakeClock
 import org.specs2.matcher.{Matchers, Scope}
 import org.specs2.mutable.SpecWithJUnit
 import scala.concurrent.duration._
@@ -9,7 +10,8 @@ import scala.concurrent.duration._
 class RollingWindowThrottlerTest extends SpecWithJUnit with Matchers{
 
   trait Context extends Scope{
-    val aThrottler = new RollingWindowThrottler(durationWindow = 1.minute, max = 1)
+    val clock = new FakeClock
+    val aThrottler = new RollingWindowThrottler(durationWindow = 1.minute, max = 1, clock = clock)
     val anIp = "192.168.2.1"
   }
 
@@ -25,6 +27,12 @@ class RollingWindowThrottlerTest extends SpecWithJUnit with Matchers{
       val anotherIp = "192.168.10.10"
       aThrottler.tryAcquire(anIp) must beAllowedRequest(anIp)
       aThrottler.tryAcquire(anotherIp) must beAllowedRequest(anIp)
+    }
+    "re-allow request after ending of the sliding window" in new Context {
+      aThrottler.tryAcquire(anIp) must beAllowedRequest(anIp)
+      aThrottler.tryAcquire(anIp) must beThrottledRequest(anIp)
+      clock.age(2.minutes)
+      aThrottler.tryAcquire(anIp) must beAllowedRequest(anIp)
     }
   }
 

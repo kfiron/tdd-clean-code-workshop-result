@@ -1,16 +1,26 @@
 package com.workshop
 
+import java.time.Clock
 import java.util.concurrent.atomic.AtomicLong
 
 import scala.concurrent.duration.FiniteDuration
 
 
-class RollingWindowThrottler(durationWindow: FiniteDuration, max: Int) {
+class RollingWindowThrottler(durationWindow: FiniteDuration, max: Int, clock: Clock) {
 
 
-  private val invocationInfo = collection.mutable.HashMap.empty[String, AtomicLong]
+  private val invocationInfo = collection.mutable.HashMap.empty[String, InvocationInfo]
 
   def tryAcquire(key: String): Boolean = {
-    invocationInfo.getOrElseUpdate(key, new AtomicLong(0)).incrementAndGet() <= max
+    val invocation = invocationInfo.getOrElseUpdate(key, new InvocationInfo(new AtomicLong(0), clock.millis))
+    if ((clock.millis() - invocation.timeStamp) > durationWindow.toMillis){
+      invocationInfo.put(key, new InvocationInfo(new AtomicLong(0), clock.millis()))
+      true
+    }
+    else
+      invocation.counter.incrementAndGet() <= max
+
   }
 }
+
+case class InvocationInfo(counter: AtomicLong, timeStamp: Long)

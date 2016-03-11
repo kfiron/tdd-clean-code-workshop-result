@@ -2,54 +2,44 @@ package com.workshop
 
 
 import com.workshop.framework.FakeClock
-import com.workshop.throttler.RollingWindowKeyThrottler
-import org.joda.time.DateTime
 import org.specs2.matcher.{Matchers, Scope}
-import org.specs2.mutable.SpecificationWithJUnit
+import org.specs2.mutable.SpecWithJUnit
 import scala.concurrent.duration._
 
 
-class RollingWindowThrottlerTest
-  extends SpecificationWithJUnit
-  with ThrottlerMatchers{
+class RollingWindowThrottlerTest extends SpecWithJUnit with Matchers{
 
   trait Context extends Scope{
-    val clock = new FakeClock(new DateTime().getMillis)
+    val clock = new FakeClock
+    val aThrottler = new RollingWindowThrottler(durationWindow = 1.minute, max = 1, clock = clock)
     val anIp = "192.168.2.1"
-    val anotherIp = "192.168.2.2"
-    val aThrottler = new RollingWindowKeyThrottler(durationWindow = 1.minute,
-      max = 1,
-      clock = clock)
   }
 
   "RollingWindowThrottler" should {
-    "allow request in the sliding window" in new Context{
-      val allowed = aThrottler.tryAcquire(anIp)
-      allowed must beAllowedRequest(anIp)
+    "allow request within the sliding window" in new Context  {
+      aThrottler.tryAcquire(anIp) must beAllowedRequest(anIp)
     }
-    "allow 2 different requests in the sliding window" in new Context{
-      aThrottler.tryAcquire(anIp)  must beAllowedRequest(anIp)
-      aThrottler.tryAcquire(anotherIp)  must beAllowedRequest(anIp)
-
-    }
-    "not allow request above the max in the sliding window" in new Context{
+    "throttle request which exceed the sliding window" in new Context {
       aThrottler.tryAcquire(anIp) must beAllowedRequest(anIp)
       aThrottler.tryAcquire(anIp) must beThrottledRequest(anIp)
     }
-    "allow second request for the same IP after the sliding window is ended" in new Context{
+    "allow 2 requests with different key" in new Context {
+      val anotherIp = "192.168.10.10"
       aThrottler.tryAcquire(anIp) must beAllowedRequest(anIp)
-      clock.age(2.minute)
-      aThrottler.tryAcquire(anIp) must beAllowedRequest(anIp)
+      aThrottler.tryAcquire(anotherIp) must beAllowedRequest(anIp)
     }
-    "not allow 3rd request for the same ip after second sliding window" in new Context{
-      aThrottler.tryAcquire(anIp) must beAllowedRequest(anIp)
-      clock.age(2.minute)
+    "re-allow request after ending of the sliding window" in new Context {
       aThrottler.tryAcquire(anIp) must beAllowedRequest(anIp)
       aThrottler.tryAcquire(anIp) must beThrottledRequest(anIp)
+      clock.age(2.minutes)
+      aThrottler.tryAcquire(anIp) must beAllowedRequest(anIp)
     }
   }
 
+  def beAllowedRequest(key: String) = beTrue ^^
+    { (b: Boolean) => b aka s"expected invocation key $key to be allowed but" }
 
+  def beThrottledRequest(key: String) = beFalse ^^
+    { (b: Boolean) => b aka s"expected invocation key $key to be throttled but" }
 
 }
-

@@ -1,38 +1,48 @@
 package com.workshop
 
 import java.time.Clock
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
+
+import com.google.common.base.Ticker
+import com.google.common.cache.{CacheLoader, CacheBuilder, LoadingCache}
 
 import scala.concurrent.duration.FiniteDuration
 
 
 class RollingWindowThrottler(durationWindow: FiniteDuration, max: Int, clock: Clock) {
 
+  private val invocations : LoadingCache[String, AtomicLong] =
+    CacheBuilder.newBuilder()
+      .expireAfterWrite(durationWindow.toMillis, TimeUnit.MILLISECONDS)
+      .ticker(throttlerTicker())
+      .build(defaultLoadingCache())
 
-  private val invocationInfo = collection.mutable.HashMap.empty[String, InvocationInfo]
+
+
 
   def tryAcquire(key: String): Boolean = {
-    val invocation = invocationInfo.getOrElseUpdate(key, newInvocationInfo)
-    acquire((key, invocation))
+    invocations.get(key).incrementAndGet() <= max
   }
 
-  def acquire = reset orElse validate
 
-  private def reset: PartialFunction[(String, InvocationInfo), Boolean] = {
-    case (key, invocation) if expires(invocation) => {
-      invocationInfo.-=(key)
-      tryAcquire(key)
+
+  def throttlerTicker(): Ticker = new Ticker {
+    override def read(): Long = {
+      TimeUnit.MILLISECONDS.toNanos(clock.millis())
     }
   }
 
-  private def validate: PartialFunction[(String, InvocationInfo), Boolean] = {
-    case(key, invocation) => invocation.counter.incrementAndGet() <= max
-  }
 
-  private def newInvocationInfo = new InvocationInfo(counter = new AtomicLong(0),
-    clock.millis())
+  def defaultLoadingCache(): CacheLoader[String, AtomicLong] =
+    new CacheLoader[String, AtomicLong] {
+      override def load(k: String): AtomicLong = {
+        new AtomicLong(0)
+      }
+    }
 
-  private def expires(invocation: InvocationInfo) = (clock.millis() - invocation.timeStamp) > durationWindow.toMillis
+
+
 }
 
-case class InvocationInfo(counter: AtomicLong, timeStamp: Long)
+

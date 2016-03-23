@@ -1,16 +1,16 @@
 package com.workshop
 
+import java.time.Clock
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
 import com.google.common.base.Ticker
 import com.google.common.cache.{CacheLoader, CacheBuilder, LoadingCache}
-import com.workshop.framework.ClockTicker
 
 import scala.concurrent.duration.FiniteDuration
 
 
-class RollingWindowThrottler(durationWindow: FiniteDuration, max: Int, clockTicker: ClockTicker) {
+class RollingWindowThrottler(durationWindow: FiniteDuration, max: Int, clock: Clock) {
 
   private val invocations : LoadingCache[String, AtomicLong] =
     CacheBuilder.newBuilder()
@@ -29,7 +29,7 @@ class RollingWindowThrottler(durationWindow: FiniteDuration, max: Int, clockTick
 
   def throttlerTicker(): Ticker = new Ticker {
     override def read(): Long = {
-      clockTicker.now
+      TimeUnit.MILLISECONDS.toNanos(clock.instant().toEpochMilli)
     }
   }
 

@@ -1,6 +1,6 @@
 package com.workshop
 
-import java.time.Clock
+import java.time.{Instant, Clock}
 
 import com.workshop.framework.FakeClock
 import org.specs2.mutable.SpecWithJUnit
@@ -47,17 +47,24 @@ class RollingWindowThrottler(
                               durationWindow: FiniteDuration,
                               clock: Clock) {
 
-  val invocations = scala.collection.mutable.HashMap.empty[String, Counter]
+  val invocations = scala.collection.mutable.HashMap.empty[String, Invocation]
   def tryAcquire(key: String): Try[Unit] = {
     Try{
-      val counter = invocations.getOrElseUpdate(key, Counter())
-      counter.inc
-      if(counter.count > max){
+      var invocation = invocations.getOrElseUpdate(key, Invocation(Counter(), clock.instant()))
+      if((clock.instant().toEpochMilli - invocation.timeStamp.toEpochMilli) >= durationWindow.toMillis){
+        invocation = Invocation(Counter(), clock.instant())
+        invocations.update(key, invocation)
+      }
+      invocation.counter.inc
+      if(invocation.counter.count > max){
         throw new Exception
       }
     }
   }
 }
+
+case class Invocation(counter: Counter, timeStamp: Instant)
+
 case class Counter(var count: Int = 0) {
   def inc {
     count += 1

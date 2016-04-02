@@ -26,7 +26,7 @@ class RollingWindowThrottlerTest extends SpecWithJUnit {
     }
     "Throttle request which exceeded the limit" in new ThrottlerScope{
       aThrottler.tryAcquire(anIp) must beSuccessfulTry
-      aThrottler.tryAcquire(anIp) must beFailedTry
+      aThrottler.tryAcquire(anIp) must beFailedTry.withThrowable[ThrottleException]
     }
     "Allow two different requests with different keys" in new ThrottlerScope{
       val anotherIp = "200.200.200.1"
@@ -50,17 +50,24 @@ class RollingWindowThrottler(
   val invocations = scala.collection.mutable.HashMap.empty[String, Invocation]
   def tryAcquire(key: String): Try[Unit] = {
     Try{
-      var invocation = invocations.getOrElseUpdate(key, Invocation(Counter(), clock.instant()))
-      if((clock.instant().toEpochMilli - invocation.timeStamp.toEpochMilli) >= durationWindow.toMillis){
-        invocation = Invocation(Counter(), clock.instant())
+      var invocation = invocations.getOrElseUpdate(key, newInvocation)
+      if(expires(invocation)){
+        invocation = newInvocation
         invocations.update(key, invocation)
       }
       invocation.counter.inc
       if(invocation.counter.count > max){
-        throw new Exception
+        throw new ThrottleException
       }
     }
   }
+
+  def newInvocation: Invocation =
+    Invocation(Counter(), clock.instant())
+
+  def expires(invocation: Invocation): Boolean =
+    (clock.instant().toEpochMilli - invocation.timeStamp.toEpochMilli) >= durationWindow.toMillis
+
 }
 
 case class Invocation(counter: Counter, timeStamp: Instant)
@@ -70,3 +77,5 @@ case class Counter(var count: Int = 0) {
     count += 1
   }
 }
+
+class ThrottleException extends Exception

@@ -1,15 +1,23 @@
 package com.workshop
 
+import java.time.Clock
+
+import com.workshop.framework.FakeClock
 import org.specs2.mutable.SpecWithJUnit
 import org.specs2.specification.Scope
 
 import scala.util.Try
+import scala.concurrent.duration._
 
 class RollingWindowThrottlerTest extends SpecWithJUnit {
 
   class ThrottlerScope extends Scope{
+    val clock = new FakeClock()
     val anIp = "192.168.2.1"
-    val aThrottler = new RollingWindowThrottler(max = 1)
+    val aThrottler = new RollingWindowThrottler(
+      max = 1,
+      durationWindow = 1.minutes,
+      clock = clock)
   }
 
   "RollingWindowThrottler" should {
@@ -25,11 +33,19 @@ class RollingWindowThrottlerTest extends SpecWithJUnit {
       aThrottler.tryAcquire(anIp) must beSuccessfulTry
       aThrottler.tryAcquire(anotherIp) must beSuccessfulTry
     }
+    "Re-Allow requests after rolling window ended" in new ThrottlerScope{
+      aThrottler.tryAcquire(anIp) must beSuccessfulTry
+      clock.age(1.minute)
+      aThrottler.tryAcquire(anIp) must beSuccessfulTry
+    }
   }
 
 }
 
-class RollingWindowThrottler(max: Int = 1) {
+class RollingWindowThrottler(
+                              max: Int = 1,
+                              durationWindow: FiniteDuration,
+                              clock: Clock) {
 
   val invocations = scala.collection.mutable.HashMap.empty[String, Counter]
   def tryAcquire(key: String): Try[Unit] = {

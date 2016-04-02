@@ -20,14 +20,21 @@ class RollingWindowThrottlerTest extends SpecWithJUnit {
       aThrottler.tryAcquire(anIp) must beSuccessfulTry
       aThrottler.tryAcquire(anIp) must beFailedTry
     }
+    "Allow two different requests with different keys" in new ThrottlerScope{
+      val anotherIp = "200.200.200.1"
+      aThrottler.tryAcquire(anIp) must beSuccessfulTry
+      aThrottler.tryAcquire(anotherIp) must beSuccessfulTry
+    }
   }
 
 }
 
 class RollingWindowThrottler(max: Int = 1) {
-  val counter = Counter()
+
+  val invocations = scala.collection.mutable.HashMap.empty[String, Counter]
   def tryAcquire(key: String): Try[Unit] = {
     Try{
+      val counter = invocations.getOrElseUpdate(key, Counter())
       counter.inc
       if(counter.count > max){
         throw new Exception
@@ -35,7 +42,6 @@ class RollingWindowThrottler(max: Int = 1) {
     }
   }
 }
-
 case class Counter(var count: Int = 0) {
   def inc {
     count += 1

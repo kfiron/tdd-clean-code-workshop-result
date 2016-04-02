@@ -1,12 +1,9 @@
 package com.workshop
 
-import java.time.{Instant, Clock}
-
 import com.workshop.framework.FakeClock
 import org.specs2.mutable.SpecWithJUnit
 import org.specs2.specification.Scope
 
-import scala.util.Try
 import scala.concurrent.duration._
 
 class RollingWindowThrottlerTest extends SpecWithJUnit {
@@ -41,41 +38,3 @@ class RollingWindowThrottlerTest extends SpecWithJUnit {
   }
 
 }
-
-class RollingWindowThrottler(
-                              max: Int = 1,
-                              durationWindow: FiniteDuration,
-                              clock: Clock) {
-
-  val invocations = scala.collection.mutable.HashMap.empty[String, Invocation]
-  def tryAcquire(key: String): Try[Unit] = {
-    Try{
-      var invocation = invocations.getOrElseUpdate(key, newInvocation)
-      if(expires(invocation)){
-        invocation = newInvocation
-        invocations.update(key, invocation)
-      }
-      invocation.counter.inc
-      if(invocation.counter.count > max){
-        throw new ThrottleException
-      }
-    }
-  }
-
-  def newInvocation: Invocation =
-    Invocation(Counter(), clock.instant())
-
-  def expires(invocation: Invocation): Boolean =
-    (clock.instant().toEpochMilli - invocation.timeStamp.toEpochMilli) >= durationWindow.toMillis
-
-}
-
-case class Invocation(counter: Counter, timeStamp: Instant)
-
-case class Counter(var count: Int = 0) {
-  def inc {
-    count += 1
-  }
-}
-
-class ThrottleException extends Exception

@@ -4,7 +4,7 @@ import org.specs2.mutable.SpecWithJUnit
 
 import scala.util.Try
 
-class RollingWindowThrottlerTest extends SpecWithJUnit{
+class RollingWindowThrottlerTest extends SpecWithJUnit {
 
   "RollingWindowThrottler" should {
     "Allow request" in {
@@ -21,5 +21,19 @@ class RollingWindowThrottlerTest extends SpecWithJUnit{
 }
 
 class RollingWindowThrottler(max: Int = 1) {
-  def tryAcquire(key: String): Try[Unit] = Try()
+  val counter = Counter()
+  def tryAcquire(key: String): Try[Unit] = {
+    Try{
+      counter.inc
+      if(counter.count > max){
+        throw new Exception
+      }
+    }
+  }
+}
+
+case class Counter(var count: Int = 0) {
+  def inc {
+    count += 1
+  }
 }

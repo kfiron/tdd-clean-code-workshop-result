@@ -14,15 +14,6 @@ class RollingWindowThrottler(
                               durationWindow: FiniteDuration,
                               clock: Clock) {
 
-
-  def defaultInvocation(): CacheLoader[String, Counter] = new CacheLoader[String, Counter] {
-    override def load(k: String): Counter = Counter()
-  }
-
-  def throttlerTicker(): Ticker = new Ticker {
-    override def read(): Long = TimeUnit.MILLISECONDS.toNanos(clock.instant().toEpochMilli)
-  }
-
   val invocations : LoadingCache[String, Counter] = CacheBuilder.newBuilder()
      .expireAfterWrite(durationWindow.toMillis, TimeUnit.MILLISECONDS)
      .ticker(throttlerTicker())
@@ -38,4 +29,11 @@ class RollingWindowThrottler(
     }
   }
 
+  def defaultInvocation(): CacheLoader[String, Counter] = new CacheLoader[String, Counter] {
+    override def load(k: String): Counter = Counter()
+  }
+
+  def throttlerTicker(): Ticker = new Ticker {
+    override def read(): Long = TimeUnit.MILLISECONDS.toNanos(clock.instant().toEpochMilli)
+  }
 }

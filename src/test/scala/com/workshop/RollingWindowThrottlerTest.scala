@@ -18,7 +18,7 @@ class RollingWindowThrottlerTest extends SpecificationWithJUnit{
     }
     "throttle second request which exceeded the max" in new ThrottlerScope{
       aThrottler.tryAcquire(anIp) must beSuccessfulTry
-      aThrottler.tryAcquire(anIp) must beFailedTry
+      aThrottler.tryAcquire(anIp) must beFailedTry.withThrowable[ThrottleException]
     }
     "allow second request but with different key" in new ThrottlerScope{
       val anotherIp = "200.200.200.1"
@@ -38,7 +38,7 @@ class RollingWindowThrottler(max: Int = 1) {
     if(counter.incrementAndGet <= max){
       Success()
     }else{
-      Failure(new Exception)
+      Failure(new ThrottleException)
     }
 
   }
@@ -51,3 +51,5 @@ case class Counter(var count: Int = 0){
     count
   }
 }
+
+class ThrottleException extends Throwable

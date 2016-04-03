@@ -51,17 +51,32 @@ class RollingWindowThrottler(
   val invocations = scala.collection.mutable.HashMap.empty[String, Invocation]
 
   def tryAcquire(key: String): Try[Unit] = {
-    val invocation = invocations.getOrElseUpdate(key, Invocation(clock.instant(), Counter()))
-    if((clock.instant().toEpochMilli - invocation.timestamp.toEpochMilli) >= durationWindow.toMillis){
+    val invocation = invocations.getOrElseUpdate(key, newInvocation)
+    (expirationHandler orElse throttlerHandler)(key -> invocation)
+  }
+
+  val expirationHandler: PartialFunction[(String, Invocation), Try[Unit]] = {
+    case (key, invocation) if expires(invocation) => {
       invocations -= key
       tryAcquire(key)
-    } else if (invocation.counter.incrementAndGet <= max) {
+    }
+  }
+
+  val throttlerHandler: PartialFunction[(String, Invocation), Try[Unit]] = {
+    case (key, invocation) => if (invocation.counter.incrementAndGet <= max) {
       Success()
     } else {
       Failure(new ThrottleException)
     }
-
   }
+
+  def newInvocation: Invocation =
+    Invocation(clock.instant(), Counter())
+
+
+  def expires(invocation: Invocation): Boolean =
+    (clock.instant().toEpochMilli - invocation.timestamp.toEpochMilli) >= durationWindow.toMillis
+
 }
 
 
@@ -73,4 +88,5 @@ case class Counter(var count: Int = 0) {
 }
 
 case class Invocation(timestamp: Instant, counter: Counter)
+
 class ThrottleException extends Throwable

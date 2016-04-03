@@ -1,20 +1,24 @@
 package com.workshop
 
 import org.specs2.mutable.SpecificationWithJUnit
+import org.specs2.specification.Scope
 
 import scala.util.{Failure, Success, Try}
 
 class RollingWindowThrottlerTest extends SpecificationWithJUnit{
 
+  class ThrottlerScope extends Scope{
+    val anIp = "192.168.2.1"
+    val aThrottler = new RollingWindowThrottler(max = 1)
+  }
+
   "RollingWindowThrottler" should {
-    "allow single request" in {
-      val throttler = new RollingWindowThrottler()
-      throttler.tryAcquire("192.168.2.1") must beSuccessfulTry
+    "allow single request" in new ThrottlerScope{
+      aThrottler.tryAcquire(anIp) must beSuccessfulTry
     }
-    "throttle second request which exceeded the max" in {
-      val throttler = new RollingWindowThrottler(max = 1)
-      throttler.tryAcquire("192.168.2.1") must beSuccessfulTry
-      throttler.tryAcquire("192.168.2.1") must beFailedTry
+    "throttle second request which exceeded the max" in new ThrottlerScope{
+      aThrottler.tryAcquire(anIp) must beSuccessfulTry
+      aThrottler.tryAcquire(anIp) must beFailedTry
     }
   }
 

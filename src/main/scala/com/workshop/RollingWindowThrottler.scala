@@ -22,12 +22,12 @@ class RollingWindowThrottler(
         .ticker(throttlerTicker())
         .build(defaultCounter())
 
-  def tryAcquire(key: String): Try[Unit] = {
-    if(invocations.get(key).incrementAndGet <= max){
-      Success()
-    }else {
-      Failure(new ThrottleException)
-    }
+  def tryAcquire(key: String): Try[Unit] =
+    invocations.get(key).incrementAndGet <= max
+
+
+  implicit def booleanToTry(b: Boolean): Try[Unit] = {
+    if(b) Success() else Failure(new ThrottleException)
   }
 
   def defaultCounter(): CacheLoader[String, Counter] = new CacheLoader[String, Counter] {

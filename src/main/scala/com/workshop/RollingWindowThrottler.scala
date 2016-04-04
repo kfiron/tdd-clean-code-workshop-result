@@ -1,40 +1,34 @@
 package com.workshop
 
-import java.time.Clock
+import java.time.{Clock, Duration}
 import java.util.concurrent.TimeUnit
 
 import com.google.common.base.Ticker
-import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
+import com.google.common.cache.{CacheBuilder, CacheLoader}
 
-import scala.concurrent.duration.FiniteDuration
-import scala.util.{Failure, Success, Try}
+import scala.language.implicitConversions
+import scala.util.Try
 
-/**
- * Created by kfirb on 4/4/16.
- */
-class RollingWindowThrottler(
-                              max: Int = 1,
-                              durationWindow: FiniteDuration,
-                              clock: Clock) {
+class RollingWindowThrottler(max: Int = 1,
+                             durationWindow: Duration,
+                             clock: Clock) {
 
-  val invocations : LoadingCache[String, Counter] = CacheBuilder.newBuilder()
-        .expireAfterWrite(durationWindow.toMillis, TimeUnit.MILLISECONDS)
-        .ticker(throttlerTicker())
-        .build(defaultCounter())
+  private val invocations = CacheBuilder.newBuilder()
+    .expireAfterWrite(durationWindow.toMillis, TimeUnit.MILLISECONDS)
+    .ticker(throttlerTicker())
+    .build(defaultCounter())
 
-  def tryAcquire(key: String): Try[Unit] =
-    invocations.get(key).incrementAndGet <= max
+  def tryAcquire(key: String): Try[Unit] = invocations.get(key).incrementAndGet <= max
 
-
-  implicit def booleanToTry(b: Boolean): Try[Unit] = {
-    if(b) Success() else Failure(new ThrottleException)
+  private implicit def booleanToTry(b: Boolean): Try[Unit] = Try {
+    if (!b) throw new ThrottleException
   }
 
-  def defaultCounter(): CacheLoader[String, Counter] = new CacheLoader[String, Counter] {
+  private def throttlerTicker(): Ticker = new Ticker {
+    override def read(): Long = TimeUnit.MILLISECONDS.toNanos(clock.millis())
+  }
+
+  private def defaultCounter(): CacheLoader[String, Counter] = new CacheLoader[String, Counter] {
     override def load(key: String): Counter = Counter()
-  }
-
-  def throttlerTicker(): Ticker = new Ticker {
-    override def read(): Long = TimeUnit.MILLISECONDS.toNanos(clock.instant().toEpochMilli)
   }
 }

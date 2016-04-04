@@ -1,19 +1,19 @@
 package com.workshop
 
+import java.time.Duration
+
 import com.workshop.framework.FakeClock
-import org.specs2.mutable.SpecificationWithJUnit
+import org.specs2.mutable.SpecWithJUnit
 import org.specs2.specification.Scope
 
-import scala.concurrent.duration._
+class RollingWindowThrottlerTest extends SpecWithJUnit {
 
-class RollingWindowThrottlerTest extends SpecificationWithJUnit {
-
-  class ThrottlerScope extends Scope {
+  abstract class ThrottlerScope extends Scope {
     val clock = new FakeClock
     val anIp = "192.168.2.1"
     val aThrottler = new RollingWindowThrottler(
       max = 1,
-      durationWindow = 1.minute,
+      durationWindow = Duration.ofMinutes(1),
       clock = clock)
   }
 
@@ -33,7 +33,7 @@ class RollingWindowThrottlerTest extends SpecificationWithJUnit {
     "Re-Allow request after rolling window" in new ThrottlerScope {
       aThrottler.tryAcquire(anIp) must beSuccessfulTry
       aThrottler.tryAcquire(anIp) must beFailedTry.withThrowable[ThrottleException]
-      clock.age(1.minute)
+      clock.age(Duration.ofMinutes(1))
       aThrottler.tryAcquire(anIp) must beSuccessfulTry
     }
   }

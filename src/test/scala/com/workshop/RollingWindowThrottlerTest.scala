@@ -58,10 +58,13 @@ class RollingWindowThrottler(
     .build(defaultCounter())
 
   def tryAcquire(key: String): Try[Unit] = {
-    val count = invocations.get(key).incrementAndGet
-    if (count <= max) {
-      Success()
-    } else {
+    invocations.get(key).incrementAndGet <= max
+  }
+
+  implicit def booleanToTry(b: Boolean): Try[Unit] = {
+    if(b){
+      Try()
+    }else{
       Failure(new ThrottlingException)
     }
   }

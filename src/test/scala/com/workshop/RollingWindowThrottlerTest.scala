@@ -8,7 +8,7 @@ import scala.concurrent.duration._
 
 class RollingWindowThrottlerTest extends SpecificationWithJUnit {
 
-  class ThrottlerScope extends Scope {
+  class RollingWindowScope extends Scope {
     val clock = new FakeClock
     val anIp = "192.168.2.1"
     val aThrottler = new RollingWindowThrottler(
@@ -18,24 +18,26 @@ class RollingWindowThrottlerTest extends SpecificationWithJUnit {
   }
 
   "RollingWindowThrottler" should {
-    "allow single request" in new ThrottlerScope {
+    "Allow one request" in new RollingWindowScope {
       aThrottler.tryAcquire(anIp) must beSuccessfulTry
     }
-    "throttle second request which exceeded the max" in new ThrottlerScope {
+    "Throttle request that exceeded max requests" in new RollingWindowScope {
       aThrottler.tryAcquire(anIp) must beSuccessfulTry
-      aThrottler.tryAcquire(anIp) must beFailedTry.withThrowable[ThrottleException]
+      aThrottler.tryAcquire(anIp) must beFailedTry.withThrowable[ThrottlingException]
     }
-    "allow second request but with different key" in new ThrottlerScope {
+    "Allow second request but with different key" in new RollingWindowScope {
       val anotherIp = "200.200.200.1"
       aThrottler.tryAcquire(anIp) must beSuccessfulTry
       aThrottler.tryAcquire(anotherIp) must beSuccessfulTry
     }
-    "Re-Allow request after rolling window" in new ThrottlerScope {
+    "Re-allow request after rolling window is ended" in new RollingWindowScope {
       aThrottler.tryAcquire(anIp) must beSuccessfulTry
-      aThrottler.tryAcquire(anIp) must beFailedTry.withThrowable[ThrottleException]
+      aThrottler.tryAcquire(anIp) must beFailedTry
       clock.age(1.minute)
       aThrottler.tryAcquire(anIp) must beSuccessfulTry
     }
   }
 
 }
+
+

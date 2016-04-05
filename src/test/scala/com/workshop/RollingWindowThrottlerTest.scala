@@ -16,9 +16,14 @@ class RollingWindowThrottlerTest extends SpecificationWithJUnit{
     "Allow one request" in new RollingWindowScope{
       aThrottler.tryAcquire(anIp) must beSuccessfulTry
     }
-    "Does not allow more then max requests" in new RollingWindowScope{
-      aThrottler.tryAcquire("192.168.2.1") must beSuccessfulTry
-      aThrottler.tryAcquire("192.168.2.1") must beFailedTry
+    "Throttle request that exceeded max requests" in new RollingWindowScope{
+      aThrottler.tryAcquire(anIp) must beSuccessfulTry
+      aThrottler.tryAcquire(anIp) must beFailedTry
+    }
+    "Allow second request but with different key" in new RollingWindowScope{
+      val anotherIp = "200.200.200.1"
+      aThrottler.tryAcquire(anIp) must beSuccessfulTry
+      aThrottler.tryAcquire(anotherIp) must beSuccessfulTry
     }
   }
 
@@ -27,9 +32,10 @@ class RollingWindowThrottlerTest extends SpecificationWithJUnit{
 class RollingWindowThrottler(max: Int) {
 
   val counter = Counter()
+  val invocations = scala.collection.mutable.HashMap.empty[String, Counter]
 
   def tryAcquire(key: String): Try[Unit] = {
-    val count = counter.incrementAndGet
+    val count = invocations.getOrElseUpdate(key, Counter()).incrementAndGet
     if(count <= max) {
       Success()
     }else{
